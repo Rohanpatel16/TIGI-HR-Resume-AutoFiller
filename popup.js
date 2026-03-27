@@ -116,19 +116,43 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fetchSelect2Id = async (type, query) => {
                         const endpoint = SEARCH_ENDPOINTS[type];
                         if (!endpoint) return null;
-                        
-                        const url = `${endpoint}?term=${encodeURIComponent(query)}&_type=query&q=${encodeURIComponent(query)}`;
-                        try {
-                            const response = await fetch(url);
-                            const results = await response.json();
-                            if (results && results.length > 0) {
-                                // Try to find an exact case-insensitive match first
-                                const exactMatch = results.find(r => r.text.trim().toLowerCase() === query.toLowerCase());
-                                return exactMatch ? exactMatch.id : results[0].id;
+
+                        const performFetch = async (q) => {
+                            const url = `${endpoint}?term=${encodeURIComponent(q)}&_type=query&q=${encodeURIComponent(q)}`;
+                            try {
+                                const response = await fetch(url);
+                                const results = await response.json();
+                                return (results && results.length > 0) ? results : null;
+                            } catch (e) {
+                                console.error(`Error fetching ID for ${type}: ${q}`, e);
+                                return null;
                             }
-                        } catch (e) {
-                            console.error(`Error fetching ID for ${type}: ${query}`, e);
+                        };
+
+                        let cleanQuery = query.trim();
+                        
+                        // 1. Location Sanitization
+                        if (type === 'cur_location' || type === 'pref_location') {
+                            cleanQuery = cleanQuery.replace(/,?\s*(India|Gujarat|Maharashtra|Karnataka|Tamil\s*Nadu|Delhi|State)\s*$/i, '').trim();
                         }
+
+                        let results = await performFetch(cleanQuery);
+
+                        // 2. Retry Logic for Qualification if no results
+                        if (!results && type === 'qualification') {
+                            // Try extracting the simplified degree (e.g., "MBA" from "MBA (Finance)")
+                            const match = cleanQuery.match(/^([A-Za-z\.]+)/);
+                            if (match && match[1] !== cleanQuery) {
+                                results = await performFetch(match[1]);
+                            }
+                        }
+
+                        if (results) {
+                            // Try to find an exact case-insensitive match first
+                            const exactMatch = results.find(r => r.text.trim().toLowerCase() === cleanQuery.toLowerCase());
+                            return exactMatch ? exactMatch.id : results[0].id;
+                        }
+
                         return null;
                     };
 
@@ -141,10 +165,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     ];
 
                     simpleFields.forEach(field => {
-                        if (data[field] !== null && data[field] !== undefined) {
+                        let value = data[field];
+                        if (value !== null && value !== undefined) {
+                            // Sanitization for mobile numbers
+                            if (field === 'mobile' || field === 'mobile_2') {
+                                const digitsOnly = value.toString().replace(/\D/g, '');
+                                if (digitsOnly.length > 10) {
+                                    value = digitsOnly.slice(-10); // Keep last 10 digits
+                                } else {
+                                    value = digitsOnly;
+                                }
+                            }
+
                             const $el = $(FIELD_IDS[field]);
                             if ($el.length) {
-                                $el.val(data[field]).trigger('input').trigger('change').trigger('keyup');
+                                $el.val(value).trigger('input').trigger('change').trigger('keyup');
                             }
                         }
                     });
@@ -266,14 +301,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             Strict Data Requirements:
             - full_name, email, current_company.
-            - mobile: Extract the primary phone number. Return ONLY 10 digits (no country code, no spaces).
+            - mobile: Extract the primary phone number. Return ONLY 10 digits (no country code, no spaces). IMPORTANT: if number is 91XXXXXXXXXX, return only XXXXXXXXXX.
             - mobile_2: Extract secondary phone number if present. Return ONLY 10 digits.
-            - skills: Identify and extract EVERY technical and soft skill mentioned in the CV. Do NOT skip, summarize, or group them. List them as individual strings.
-            - designation: List all job titles or designations mentioned.
+            - skills: Identify and extract EVERY technical and soft skill mentioned. Do NOT skip. List them as individual strings.
+            - designation: List ONLY the CURRENT or MOST RECENT designation (one string). Do NOT provide a list of all historical roles. 
             ${expInstruction}
             - cur_salary_lakh, cur_salary_thousand, exp_salary_lakh, exp_salary_thousand.
             - notice_period: Must be exactly one of [Immediate, 7 Days, 15 Days, 30 Days, 45 Days, 60 Days, 90 Days].
-            - qualification, pref_location, cur_location, gender (male/female).
+            - qualification: EXTRACT ONLY THE DEGREE NAME (e.g., "MBA", "B.Tech", "B.Com", "BA", "12th", "10th"). Do not include specialized majors or university names in parentheses.
+            - cur_location, pref_location: Provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). DO NOT include state or country names.
+            - industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). Provide one string.
+            - gender: male/female.
             - summary: A concise internal summary for the recruiting team.
             - bio: High-quality professional profile bio for the client to read. MUST be between 50 and 220 characters.
 
