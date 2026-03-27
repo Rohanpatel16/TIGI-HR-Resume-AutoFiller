@@ -114,6 +114,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     const $ = window.jQuery;
 
                     const fetchSelect2Id = async (type, query) => {
+                        const QUALIFICATIONS_MASTER = [
+                            "BTM", "BJMC", "BSW", "B.F.Sc(Fisheries)", "B.P.Ed", "BHMS", "BAMS", "BFA", "B.FashionTech", "B.Design",
+                            "MBBS", "LLB", "ICWA", "CS", "CA", "BVSc", "BSc", "BHM", "BEd", "BE/B.Tech", "BDS", "BCA", "BBA/BBM", "BA",
+                            "B.Pharm", "B.Com", "B.Arch", "All Post Graduates (PG)", "MTM", "M.F.Sc(Fisheries)", "MPEd", "MVSc",
+                            "PG Diploma", "MSW", "MSc", "MS", "MHM", "MEd", "ME/M.Tech", "MDS", "MD", "MCA", "MBA/PGDM", "MA",
+                            "M.Pham", "M.Com", "M.Arch", "M Phil / Phd", "LLM", "All other Non-Graduates", "No Education/Schooling",
+                            "Upto 9th Std", "10th Pass (SSC)", "12th Pass (HSE)", "Vocational Training", "Certificate Course (ITI)",
+                            "Diploma", "MLW", "Chemical Supervisor", "B.Pharma", "Pharmacy", "B.TECH", "12th standard", "10th standard",
+                            "B.tech computer science", "BE/B.Tech", "BE", "Bachelors of computer engineering", "Senior secondary", "B.E (EEE)", "B.Tech CSE", "B.Tech (Computer Science Engineering)",
+                            "Masters in Computer Applications", "B.TECH(ECE)", "B.Tech in Computer Science", "M.C.A", "B.C.A", "M.Tech", "B.Tech Civil Engg", "Class 12", "Class 10", "12th", "10th",
+                            "B.Sc. Computer technology", "B.E (Electronics and Communication)", "PGDM", "B.SC ( Computer science )",
+                            "B.Tech [ECE]", "B.Tech (Mechanical)", "Intermediate", "B.Tech in Software Engineering", "Bachelor of Engineering",
+                            "Computer Science", "HSC", "B.Tech in Information Science and Engineering", "B-Tech", "10+2", "PUC", "SSLC"
+                        ];
+
+                        const standardizeQualification = (raw) => {
+                            if (!raw || type !== 'qualification') return raw;
+                            const normalized = raw.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                            const mapping = {
+                                'btech': 'BE/B.Tech', 'be': 'BE/B.Tech', 'bacheloroftechnology': 'BE/B.Tech', 'bachelorofengineering': 'BE/B.Tech',
+                                'mtech': 'ME/M.Tech', 'me': 'ME/M.Tech', 'masteroftechnology': 'ME/M.Tech', 'masterofengineering': 'ME/M.Tech',
+                                'mba': 'MBA/PGDM', 'pgdm': 'MBA/PGDM', 'bsc': 'BSc', 'msc': 'MSc', 'bca': 'BCA', 'mca': 'MCA',
+                                'bcom': 'B.Com', 'mcom': 'M.Com', '12th': '12th Pass (HSE)', '10th': '10th Pass (SSC)',
+                                'ssc': '10th Pass (SSC)', 'hsc': '12th Pass (HSE)', 'intermediate': '12th Pass (HSE)'
+                            };
+                            if (mapping[normalized]) return mapping[normalized];
+                            const exact = QUALIFICATIONS_MASTER.find(q => q.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized);
+                            return exact || raw;
+                        };
+
                         const endpoint = SEARCH_ENDPOINTS[type];
                         if (!endpoint) return null;
 
@@ -129,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         };
 
-                        let cleanQuery = query.trim();
+                        let cleanQuery = standardizeQualification(query.trim());
                         
                         // 1. Location Sanitization
                         if (type === 'cur_location' || type === 'pref_location') {
@@ -301,6 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             Strict Data Requirements:
             - full_name, email, current_company.
+            - linkedIn_link: The full URL to the candidate's LinkedIn profile.
+            - portfolio_link: The full URL to the candidate's portfolio, GitHub, or personal website.
             - mobile: Extract the primary phone number. Return ONLY 10 digits (no country code, no spaces). IMPORTANT: if number is 91XXXXXXXXXX, return only XXXXXXXXXX.
             - mobile_2: Extract secondary phone number if present. Return ONLY 10 digits.
             - skills: Identify and extract EVERY technical and soft skill mentioned. Do NOT skip. List them as individual strings.
@@ -308,7 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ${expInstruction}
             - cur_salary_lakh, cur_salary_thousand, exp_salary_lakh, exp_salary_thousand.
             - notice_period: Must be exactly one of [Immediate, 7 Days, 15 Days, 30 Days, 45 Days, 60 Days, 90 Days].
-            - qualification: EXTRACT ONLY THE DEGREE NAME (e.g., "MBA", "B.Tech", "B.Com", "BA", "12th", "10th"). Do not include specialized majors or university names in parentheses.
+            - qualification: EXTRACT ONLY THE DEGREE NAME. 
+              IMPORTANT HINTS for mapping: Use formats like "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)".
             - cur_location, pref_location: Provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). DO NOT include state or country names.
             - industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). Provide one string.
             - gender: male/female.
