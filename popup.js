@@ -546,4 +546,21 @@ Output NOTHING except the raw, strictly valid JSON object described in the <json
         }
         return JSON.parse(jsonMatch[0]);
     }
+
+    // --- Authorship Integrity Check ---
+    // This script ensures the credits in the footer remain intact.
+    // If the footer is tampered with, the extension functionality is disabled.
+    const checkIntegrity = () => {
+        const footer = document.getElementById('madeBy');
+        const expected = "made by Rohan Patel";
+        if (!footer || footer.textContent.trim() !== expected) {
+            processBtn.style.display = 'none'; // Lock the main feature
+            statusDiv.textContent = "Error: Developer credits tampered with.";
+            statusDiv.className = 'status error';
+        }
+    };
+    
+    // Check every 2 seconds to prevent runtime removal
+    setInterval(checkIntegrity, 2000);
+    checkIntegrity();
 });
