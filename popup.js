@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Save settings on change
     const saveSettings = () => {
-        chrome.storage.local.set({ 
+        chrome.storage.local.set({
             geminiApiKey: apiKeyInput.value,
             geminiModel: modelNameInput.value,
             relevantExpOnly: document.getElementById('relevantExpOnly').checked
@@ -52,14 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const fileData = await readFileAsBase64(file);
             updateStatus(`Processing with ${model}...`);
-            
+
             const extractedData = await callGeminiAPI(apiKey, model, fileData, file.type);
-            
+
             updateStatus("Filling form...");
-            
+
             // Send to content script
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
+
             if (!tab || (!tab.url.includes("employer.tigihr.com"))) {
                 throw new Error("Please open the TIGI HR 'Add Resume' page first.");
             }
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
 
                         let cleanQuery = standardizeQualification(query.trim());
-                        
+
                         // 1. Location Sanitization
                         if (type === 'cur_location' || type === 'pref_location') {
                             cleanQuery = cleanQuery.replace(/,?\s*(India|Gujarat|Maharashtra|Karnataka|Tamil\s*Nadu|Delhi|State)\s*$/i, '').trim();
@@ -188,9 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // 1. Simple Text Inputs
                     const simpleFields = [
-                        'full_name', 'email', 'mobile', 'mobile_2', 
-                        'current_company', 'offer_inhand', 
-                        'admin_comment', 'summary', 'bio', 
+                        'full_name', 'email', 'mobile', 'mobile_2',
+                        'current_company', 'offer_inhand',
+                        'admin_comment', 'summary', 'bio',
                         'linkedIn_link', 'portfolio_link'
                     ];
 
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // 2. Simple Dropdowns
                     const dropdownFields = [
-                        'exp_year', 'exp_month', 'cur_salary_lakh', 'cur_salary_thousand', 
+                        'exp_year', 'exp_month', 'cur_salary_lakh', 'cur_salary_thousand',
                         'exp_salary_lakh', 'exp_salary_thousand', 'gender'
                     ];
 
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const handleSelect2 = async (idKey, values) => {
                         const $el = $(FIELD_IDS[idKey]);
                         if (!$el.length || !values) return;
-                        
+
                         const vArr = Array.isArray(values) ? values : [values];
                         const selectedIds = [];
 
@@ -260,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             // Check existing options
                             const currentOptions = $el.find('option');
-                            let matched = currentOptions.filter(function() {
+                            let matched = currentOptions.filter(function () {
                                 return $(this).text().trim().toLowerCase() === valStr.toLowerCase() || $(this).val() === valStr;
                             });
 
@@ -327,36 +327,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const isRelevantExp = document.getElementById('relevantExpOnly').checked;
         const currentDate = new Date().toISOString().split('T')[0];
 
-        const expInstruction = isRelevantExp 
+        const expInstruction = isRelevantExp
             ? `- exp_year: Calculate ONLY the relevant years of experience based on the candidate's primary/target Designation. If a role is marked "Present", calculate duration up to ${currentDate}. (number)\n            - exp_month: Remaining relevant months of experience. (number between 0 and 11. MUST default to 0 if exact years).`
             : `- exp_year: Total years of overall experience across all jobs combined. If a role is marked "Present", calculate duration up to ${currentDate}. (number)\n            - exp_month: Remaining overall months of experience. (number between 0 and 11. MUST default to 0 if exact years).`;
 
         const prompt = `
-            You are an expert technical recruiter with over 10 years of experience in high-growth companies. Your goal is to accurately parse this CV and provide structured data for a candidate management system.
+<system_instructions>
+You are an expert technical recruiter with over 10 years of experience in high-growth companies. Your primary objective is to accurately parse the attached CV/Resume and extract structured data for a candidate management system.
+</system_instructions>
 
-            Extract candidate information and return ONLY a valid JSON object.
-            
-            Strict Data Requirements:
-            - full_name, email, current_company.
-            - linkedIn_link: The full URL to the candidate's LinkedIn profile.
-            - portfolio_link: The full URL to the candidate's portfolio, GitHub, or personal website.
-            - mobile: Extract the primary phone number. Return ONLY 10 digits (no country code, no spaces). IMPORTANT: if number is 91XXXXXXXXXX, return only XXXXXXXXXX.
-            - mobile_2: Extract secondary phone number if present. Return ONLY 10 digits.
-            - skills: Identify and extract EVERY technical and soft skill mentioned. Do NOT skip. List them as individual strings.
-            - designation: List ONLY the CURRENT or MOST RECENT designation (one string). Do NOT provide a list of all historical roles. 
-            ${expInstruction}
-            - cur_salary_lakh, cur_salary_thousand, exp_salary_lakh, exp_salary_thousand.
-            - notice_period: Must be exactly one of [Immediate, 7 Days, 15 Days, 30 Days, 45 Days, 60 Days, 90 Days].
-            - qualification: EXTRACT ONLY THE DEGREE NAME. 
-              IMPORTANT HINTS for mapping: Use formats like "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)".
-            - cur_location, pref_location: Provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). DO NOT include state or country names.
-            - industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). Provide one string.
-            - gender: male/female.
-            - summary: A concise internal summary for the recruiting team.
-            - bio: High-quality professional profile bio for the client to read. MUST be between 50 and 220 characters.
+<extraction_rules>
+1. Phone Numbers: Extract the primary phone number for 'mobile'. Strip all country codes (e.g., +91, 0, or 91) and spaces. Return EXACTLY 10 digits. If a number starts with 91 and has 12 digits, remove the 91. Do the same for 'mobile_2'.
+2. Designation: Extract ONLY the CURRENT or MOST RECENT job title. Do not list historical roles.
+3. Experience: ${expInstruction}
+4. Qualification: Map to standardized degree names. Examples: "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)". Extract ONLY the degree name.
+5. Location: For 'cur_location', provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). DO NOT include state or country names. 'pref_location' must strictly be set to "Anywhere in India".
+6. Skills: Extract EVERY technical and soft skill explicitly mentioned. Return as an array of strings. Do not skip any.
+7. Industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). 
+8. Bio Character Limit: Write a high-quality professional profile bio for the client to read. It MUST be exactly 1 to 2 short sentences (approx. 10 to 30 words) to ensure it stays between 50 and 200 characters.
+9. Missing Data: If ANY data is missing from the CV or cannot be confidently inferred, use null.
+</extraction_rules>
 
-            If any data is missing from the CV, use null or an empty string.
-            Return ONLY the valid JSON block.
+<json_schema>
+Return ONLY a valid JSON object matching this exact structure:
+{
+  "full_name": "string or null",
+  "email": "string or null",
+  "current_company": "string or null",
+  "linkedIn_link": "Full URL string or null",
+  "portfolio_link": "Full URL string or null",
+  "mobile": "10-digit string or null",
+  "mobile_2": "10-digit string or null",
+  "skills": ["skill1", "skill2"],
+  "designation": "Current/Most recent title string or null",
+  "exp_year": "number or null",
+  "exp_month": "number or null",
+  "cur_salary_lakh": "number or null",
+  "cur_salary_thousand": "number or null",
+  "exp_salary_lakh": "number or null",
+  "exp_salary_thousand": "number or null",
+  "qualification": "Standardized degree string or null",
+  "cur_location": "City name string or null",
+  "pref_location": "Anywhere in India",
+  "industry": "Industry string or null",
+  "gender": "'male', 'female', or null",
+  "summary": "Internal summary string for recruiting team or null",
+  "bio": "High-quality professional profile bio (10-30 words) or null"
+}
+</json_schema>
+
+<final_instruction>
+Based on the attached CV document, extract the data according to the <extraction_rules>.
+Output NOTHING except the raw, strictly valid JSON object described in the <json_schema>. Do not include markdown formatting like \`\`\`json.
+</final_instruction>
         `;
 
 
@@ -381,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const json = await response.json();
         const textResponse = json.candidates[0].content.parts[0].text;
-        
+
         // Robust JSON extraction using Regex
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
