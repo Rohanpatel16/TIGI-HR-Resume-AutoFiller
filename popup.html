@@ -1,106 +1,239 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>TIGI HR Resume Filler</title>
+  <meta charset="UTF-8">
+  <title>TIGI HR Auto-Filler</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      width: 320px;
-      padding: 15px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f8f9fa;
+      width: 340px;
+      min-height: 500px;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a0533 0%, #2d1066 50%, #0d0520 100%);
+      padding: 18px;
+      color: #fff;
     }
-    .container {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
+
+    /* Header */
     .header {
-      font-size: 18px;
-      font-weight: bold;
-      color: #291550;
-      border-bottom: 2px solid #291550;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
-    }
-    .section {
       display: flex;
-      flex-direction: column;
-      gap: 5px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
     }
+    .logo {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #9b59f5, #502ca0);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .title { font-size: 15px; font-weight: 700; }
+    .subtitle { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 1px; }
+
+    /* Glass card */
+    .glass {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      padding: 16px;
+    }
+
+    /* Fields */
+    .field { margin-bottom: 13px; }
     label {
-      font-size: 13px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
       font-weight: 600;
-      color: #444;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 5px;
     }
-    input[type="text"], input[type="file"] {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    input[type="text"] {
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 8px;
+      color: #fff;
+      padding: 9px 12px;
       font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
     }
-    button {
-      padding: 10px;
-      background: #402179;
-      color: white;
-      border: none;
-      border-radius: 4px;
+    input[type="text"]:focus {
+      border-color: rgba(155,89,245,0.7);
+      background: rgba(255,255,255,0.10);
+    }
+    input[type="text"]::placeholder { color: rgba(255,255,255,0.25); }
+
+    /* Divider */
+    .divider { height: 1px; background: rgba(255,255,255,0.08); margin: 13px 0; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 0;
+    }
+    .toggle-label { font-size: 12px; color: rgba(255,255,255,0.75); font-weight: 500; }
+    .toggle-sub { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+    .toggle {
+      width: 36px; height: 20px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 99px;
+      position: relative;
       cursor: pointer;
-      font-weight: bold;
       transition: background 0.3s;
+      flex-shrink: 0;
     }
-    button:hover {
-      background: #291550;
+    .toggle.on { background: #9b59f5; }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.3s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    #status {
-      font-size: 12px;
-      color: #666;
-      font-style: italic;
-      margin-top: 10px;
-    }
-    .footer {
-      font-size: 11px;
+    .toggle.on::after { transform: translateX(16px); }
+
+    /* File Drop */
+    .file-drop {
+      border: 2px dashed rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 18px 14px;
       text-align: center;
-      color: #888;
-      margin-top: 15px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 13px;
     }
+    .file-drop:hover { border-color: rgba(155,89,245,0.6); background: rgba(155,89,245,0.06); }
+    .file-drop.has-file { border-color: rgba(155,89,245,0.6); background: rgba(155,89,245,0.08); }
+    .file-drop .icon { font-size: 22px; margin-bottom: 5px; }
+    .file-drop .text { font-size: 12px; color: rgba(255,255,255,0.5); }
+    .file-drop .hint { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
+    .file-drop .filename { font-size: 11px; color: #c084fc; font-weight: 600; margin-top: 3px; word-break: break-all; }
+    input[type="file"] { display: none; }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #9b59f5, #502ca0);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Status + Timer */
+    .status-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 11px;
+      min-height: 18px;
+    }
+    .status {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      font-style: italic;
+      flex: 1;
+    }
+    .status.success { color: #86efac; font-style: normal; font-weight: 600; }
+    .status.error { color: #fca5a5; font-style: normal; }
+    .timer {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(155,89,245,0.8);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      margin-left: 8px;
+    }
+    .timer.done { color: #86efac; }
+
+    /* Credit */
+    .credit {
+      font-size: 10px;
+      color: rgba(255,255,255,0.18);
+      text-align: center;
+      margin-top: 12px;
+    }
+    .credit a {
+      color: rgba(255,255,255,0.28);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .credit a:hover { color: rgba(155,89,245,0.8); }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">TIGI HR Auto-Filler</div>
-    
-    <div class="section">
-      <label for="apiKey">Gemini API Key:</label>
-      <input type="text" id="apiKey" placeholder="Paste your API key here..." />
-    </div>
-
-    <div class="section">
-      <label for="modelName">Gemini Model:</label>
-      <input type="text" id="modelName" value="gemma-3-27b-it" placeholder="gemma-3-27b-it" />
-    </div>
-
-    <div class="section" style="flex-direction: row; align-items: center; gap: 8px;">
-      <input type="checkbox" id="relevantExpOnly" />
-      <label for="relevantExpOnly" style="margin: 0; cursor: pointer; line-height: 1.3;">Calculate Relevant Experience Only<br><small style="font-weight: normal; font-size: 11px; color: #666;">(Based on primary designation vs. total career)</small></label>
-    </div>
-
-    <div class="section">
-      <label for="resumeFile">Select CV (PDF/Image):</label>
-      <input type="file" id="resumeFile" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
-    </div>
-
-    <button id="processBtn">Extract & Fill Form</button>
-
-    <div id="status">Ready</div>
-
-    <div class="footer">
-      Saves settings to local storage automatically.
+  <div class="header">
+    <div class="logo">📄</div>
+    <div>
+      <div class="title">TIGI HR Auto-Filler</div>
+      <div class="subtitle">Powered by Gemma AI</div>
     </div>
   </div>
+
+  <div class="glass">
+    <div class="field">
+      <label>Gemini API Key</label>
+      <input type="text" id="apiKey" placeholder="Paste your API key..." />
+    </div>
+
+    <div class="field">
+      <label>Model</label>
+      <input type="text" id="modelName" value="gemma-3-27b-it" />
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-label">Relevant Experience Only</div>
+        <div class="toggle-sub">Based on primary designation</div>
+      </div>
+      <div class="toggle" id="toggleExp" onclick="this.classList.toggle('on')"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="file-drop" id="fileDrop" onclick="document.getElementById('resumeFile').click()">
+      <div class="icon">☁️</div>
+      <div class="text">Drop CV here or click to browse</div>
+      <div class="hint">PDF · DOCX · PNG · JPG</div>
+      <div class="filename" id="fileName"></div>
+    </div>
+    <input type="file" id="resumeFile" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" />
+
+    <button class="btn" id="processBtn">
+      <span>✨</span> Extract &amp; Fill Form
+    </button>
+
+    <div class="status-row">
+      <div class="status" id="status">Ready — open the TIGI HR portal first</div>
+      <div class="timer" id="timer"></div>
+    </div>
+  </div>
+
+  <div class="credit">made by <a href="https://www.linkedin.com/in/iamrohanpatel/" target="_blank">Rohan Patel</a></div>
+
   <script src="popup.js"></script>
 </body>
 </html>

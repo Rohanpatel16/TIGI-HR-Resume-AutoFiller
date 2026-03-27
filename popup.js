@@ -4,6 +4,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('resumeFile');
     const processBtn = document.getElementById('processBtn');
     const statusDiv = document.getElementById('status');
+    const timerDiv = document.getElementById('timer');
+    const toggleExp = document.getElementById('toggleExp');
+    const fileDrop = document.getElementById('fileDrop');
+    const fileNameDiv = document.getElementById('fileName');
+
+    // Timer state
+    let timerInterval = null;
+    let timerStart = null;
+
+    function startTimer() {
+        timerStart = Date.now();
+        timerDiv.textContent = '⏱ 0.0s';
+        timerDiv.className = 'timer';
+        timerInterval = setInterval(() => {
+            const elapsed = ((Date.now() - timerStart) / 1000).toFixed(1);
+            timerDiv.textContent = `⏱ ${elapsed}s`;
+        }, 100);
+    }
+
+    function stopTimer(success) {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        if (timerStart) {
+            const elapsed = ((Date.now() - timerStart) / 1000).toFixed(1);
+            timerDiv.textContent = `✅ ${elapsed}s`;
+            timerDiv.className = success ? 'timer done' : 'timer';
+        }
+    }
 
     // Load saved settings
     chrome.storage.local.get(['geminiApiKey', 'geminiModel', 'relevantExpOnly'], (result) => {
@@ -16,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modelNameInput.value = "gemma-3-27b-it";
         }
         if (result.relevantExpOnly) {
-            document.getElementById('relevantExpOnly').checked = true;
+            toggleExp.classList.add('on');
         }
     });
 
@@ -25,13 +55,56 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.set({
             geminiApiKey: apiKeyInput.value,
             geminiModel: modelNameInput.value,
-            relevantExpOnly: document.getElementById('relevantExpOnly').checked
+            relevantExpOnly: toggleExp.classList.contains('on')
         });
     };
 
     apiKeyInput.addEventListener('change', saveSettings);
     modelNameInput.addEventListener('change', saveSettings);
-    document.getElementById('relevantExpOnly').addEventListener('change', saveSettings);
+    toggleExp.addEventListener('click', () => setTimeout(saveSettings, 50));
+
+    // File name display
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (file) {
+            fileNameDiv.textContent = file.name;
+            fileDrop.classList.add('has-file');
+        } else {
+            fileNameDiv.textContent = '';
+            fileDrop.classList.remove('has-file');
+        }
+    });
+
+    // Drag and Drop support
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileDrop.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDrop.addEventListener(eventName, () => {
+            fileDrop.style.borderColor = 'rgba(155,89,245,0.8)';
+            fileDrop.style.background = 'rgba(155,89,245,0.1)';
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileDrop.addEventListener(eventName, () => {
+            fileDrop.style.borderColor = '';
+            fileDrop.style.background = '';
+        });
+    });
+
+    fileDrop.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            fileInput.files = files;
+            // Trigger the change event to update the UI
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    });
 
     processBtn.addEventListener('click', async () => {
         const apiKey = apiKeyInput.value;
@@ -48,16 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        updateStatus("Reading file...");
+        updateStatus("Reading file...", '');
         processBtn.disabled = true;
+        startTimer();
 
         try {
             const fileData = await readFileAsBase64(file);
-            updateStatus(`Processing with ${model}...`);
+            updateStatus(`Extracting with ${model}...`, '');
 
             const extractedData = await callGeminiAPI(apiKey, model, fileData, file.type);
 
-            updateStatus("Filling form...");
+            updateStatus('Filling form...', '');
 
             // Send to content script
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -295,9 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, (results) => {
                 if (chrome.runtime.lastError) {
-                    updateStatus("Error: " + chrome.runtime.lastError.message);
+                    stopTimer(false);
+                    updateStatus('Error: ' + chrome.runtime.lastError.message, 'error');
                 } else {
-                    updateStatus("Success! Form filled.");
+                    stopTimer(true);
+                    updateStatus('✅ Form filled successfully!', 'success');
                 }
                 processBtn.disabled = false;
             });
@@ -305,13 +381,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            updateStatus("Error: " + error.message);
+            stopTimer(false);
+            updateStatus('Error: ' + error.message, 'error');
             processBtn.disabled = false;
         }
     });
 
-    function updateStatus(msg) {
+    function updateStatus(msg, type) {
         statusDiv.textContent = msg;
+        statusDiv.className = 'status' + (type ? ' ' + type : '');
     }
 
     function readFileAsBase64(file) {
@@ -326,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function callGeminiAPI(apiKey, model, base64Data, mimeType) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        const isRelevantExp = document.getElementById('relevantExpOnly').checked;
+        const isRelevantExp = toggleExp.classList.contains('on');
         const currentDate = new Date().toISOString().split('T')[0];
 
         const expInstruction = isRelevantExp
