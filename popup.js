@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleExp = document.getElementById('toggleExp');
     const fileDrop = document.getElementById('fileDrop');
     const fileNameDiv = document.getElementById('fileName');
+    const togglePassword = document.getElementById('togglePassword');
 
     // Timer state
     let timerInterval = null;
@@ -36,17 +37,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Load saved settings
-    chrome.storage.local.get(['geminiApiKey', 'geminiModel', 'relevantExpOnly'], (result) => {
-        if (result.geminiApiKey) {
-            apiKeyInput.value = result.geminiApiKey;
-        }
+    chrome.storage.local.get(['geminiApiKey', 'geminiModel', 'relevantExpOnly', 'stagedFileName'], (result) => {
+        if (result.geminiApiKey) apiKeyInput.value = result.geminiApiKey;
         if (result.geminiModel) {
             modelNameInput.value = result.geminiModel;
         } else {
             modelNameInput.value = "gemma-3-27b-it";
         }
-        if (result.relevantExpOnly) {
-            toggleExp.classList.add('on');
+        if (result.relevantExpOnly) toggleExp.classList.add('on');
+        
+        // Show last staged file name (we don't load the buffer until needed to save memory)
+        if (result.stagedFileName) {
+            fileNameDiv.textContent = result.stagedFileName;
+            fileDrop.classList.add('has-file');
         }
     });
 
@@ -63,15 +66,47 @@ document.addEventListener('DOMContentLoaded', () => {
     modelNameInput.addEventListener('change', saveSettings);
     toggleExp.addEventListener('click', () => setTimeout(saveSettings, 50));
 
+    // Toggle API Key visibility
+    togglePassword.addEventListener('click', () => {
+        const isBlurred = apiKeyInput.classList.contains('blurred-text');
+        
+        if (isBlurred) {
+            apiKeyInput.classList.remove('blurred-text');
+        } else {
+            apiKeyInput.classList.add('blurred-text');
+        }
+        
+        const eyeSvg = '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
+        const eyeOffSvg = '<svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
+        
+        togglePassword.innerHTML = isBlurred ? eyeOffSvg : eyeSvg;
+    });
+
+    // Handle Keyboard Shortcut message
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.action === "trigger_extraction") {
+            processBtn.click();
+        }
+    });
+
     // File name display
-    fileInput.addEventListener('change', () => {
+    fileInput.addEventListener('change', async () => {
         const file = fileInput.files[0];
         if (file) {
             fileNameDiv.textContent = file.name;
             fileDrop.classList.add('has-file');
+            
+            // Stage the file for shortcut use
+            const base64 = await readFileAsBase64(file);
+            chrome.storage.local.set({ 
+                stagedFileName: file.name,
+                stagedFileBuffer: base64,
+                stagedFileType: file.type
+            });
         } else {
             fileNameDiv.textContent = '';
             fileDrop.classList.remove('has-file');
+            chrome.storage.local.remove(['stagedFileName', 'stagedFileBuffer', 'stagedFileType']);
         }
     });
 
@@ -101,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = e.dataTransfer.files;
         if (files && files.length > 0) {
             fileInput.files = files;
-            // Trigger the change event to update the UI
             fileInput.dispatchEvent(new Event('change'));
         }
     });
@@ -109,14 +143,28 @@ document.addEventListener('DOMContentLoaded', () => {
     processBtn.addEventListener('click', async () => {
         const apiKey = apiKeyInput.value;
         const model = modelNameInput.value;
-        const file = fileInput.files[0];
+        
+        let file = fileInput.files[0];
+        let fileData, fileType;
 
         if (!apiKey) {
             updateStatus("Please enter your Gemini API Key.");
             return;
         }
 
-        if (!file) {
+        if (file) {
+            fileData = await readFileAsBase64(file);
+            fileType = file.type;
+        } else {
+            // Check for staged file
+            const result = await chrome.storage.local.get(['stagedFileBuffer', 'stagedFileType']);
+            if (result.stagedFileBuffer) {
+                fileData = result.stagedFileBuffer;
+                fileType = result.stagedFileType;
+            }
+        }
+
+        if (!fileData) {
             updateStatus("Please select a CV file.");
             return;
         }
@@ -125,11 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
         processBtn.disabled = true;
         startTimer();
 
-        try {
-            const fileData = await readFileAsBase64(file);
-            updateStatus(`Extracting with ${model}...`, '');
+        updateStatus(`Extracting with ${model}...`, '');
 
-            const extractedData = await callGeminiAPI(apiKey, model, fileData, file.type);
+        try {
+            const extractedData = await callGeminiAPI(apiKey, model, fileData, fileType);
 
             updateStatus('Filling form...', '');
 

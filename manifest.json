@@ -12,6 +12,19 @@
     "https://employer.tigihr.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "trigger-extraction": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "windows": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Trigger Resume Auto-Fill"
+    }
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

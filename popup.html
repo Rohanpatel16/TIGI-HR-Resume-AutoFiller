@@ -180,6 +180,38 @@
       transition: color 0.2s;
     }
     .credit a:hover { color: rgba(155,89,245,0.8); }
+    /* API Key Field Wrapper */
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrapper input[type="text"] {
+      padding-right: 32px; /* Prevent text clipping under icon */
+    }
+    
+    /* API Key Masking */
+    .blurred-text {
+      -webkit-text-security: disc;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 10px;
+      cursor: pointer;
+      opacity: 0.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s;
+    }
+    .toggle-password svg {
+      width: 14px;
+      height: 14px;
+      fill: #fff;
+    }
+    .toggle-password:hover { opacity: 1; }
+
   </style>
 </head>
 <body>
@@ -194,7 +226,13 @@
   <div class="glass">
     <div class="field">
       <label>Gemini API Key</label>
-      <input type="text" id="apiKey" placeholder="Paste your API key..." />
+      <div class="input-wrapper">
+        <input type="text" id="apiKey" class="blurred-text" placeholder="Paste your API key..." spellcheck="false" />
+        <span class="toggle-password" id="togglePassword">
+          <!-- Eye icon -->
+          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        </span>
+      </div>
     </div>
 
     <div class="field">
