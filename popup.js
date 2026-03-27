@@ -229,7 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
-                    // 3. Notice Period Mapping
+                    // 3. Notice Period (Disabled by user request)
+                    /*
                     if (data.notice_period) {
                         const noticeMap = {
                             'Immediate': '1', '7 Days': '2', '15 Days': '3', 
@@ -237,6 +238,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         const val = noticeMap[data.notice_period] || data.notice_period;
                         $(FIELD_IDS.notice_period).val(val).trigger('change');
+                    }
+                    */
+
+                    // 4. Preferred Location Default
+                    if (!data.pref_location || (Array.isArray(data.pref_location) && data.pref_location.length === 0)) {
+                        data.pref_location = "Anywhere in India";
                     }
 
                     // 4. Select2 Handling (Async)
