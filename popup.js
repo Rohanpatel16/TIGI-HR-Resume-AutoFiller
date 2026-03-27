@@ -110,7 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Drag and Drop support
+    // Drag, Drop, and Click support
+    fileDrop.addEventListener('click', () => {
+        fileInput.click();
+    });
+
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         fileDrop.addEventListener(eventName, (e) => {
             e.preventDefault();
