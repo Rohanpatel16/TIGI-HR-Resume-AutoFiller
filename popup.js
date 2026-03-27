@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (result.geminiModel) {
             modelNameInput.value = result.geminiModel;
+        } else {
+            modelNameInput.value = "gemma-3-27b-it";
         }
         if (result.relevantExpOnly) {
             document.getElementById('relevantExpOnly').checked = true;
