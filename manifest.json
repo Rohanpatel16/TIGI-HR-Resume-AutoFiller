@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "TIGI HR Resume Auto-Filler",
+  "version": "1.0",
+  "description": "Automatically fills TIGI HR Add Resume form using Gemini AI.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://employer.tigihr.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://employer.tigihr.com/admin/resumes/add", "https://employer.tigihr.com/admin/resumes", "https://employer.tigihr.com/admin/resumes/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
