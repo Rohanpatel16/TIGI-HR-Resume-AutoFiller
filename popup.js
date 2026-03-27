@@ -341,11 +341,14 @@ You are an expert technical recruiter with over 10 years of experience in high-g
 2. Designation: Extract ONLY the CURRENT or MOST RECENT job title. Do not list historical roles.
 3. Experience: ${expInstruction}
 4. Qualification: Map to standardized degree names. Examples: "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)". Extract ONLY the degree name.
-5. Location: For 'cur_location', provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). DO NOT include state or country names. 'pref_location' must strictly be set to "Anywhere in India".
+5. Location: 
+   - For 'cur_location': Provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). If the current location is outside India, output EXACTLY "Out of India".
+   - For 'pref_location': Extract the preferred city. If the preferred location is outside India, output EXACTLY "Out of India". If no preferred location is explicitly mentioned in the CV, strictly output "Anywhere in India".
+   - DO NOT include state or country names for Indian cities.
 6. Skills: Extract EVERY technical and soft skill explicitly mentioned. Return as an array of strings. Do not skip any.
 7. Industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). 
 8. Bio Character Limit: Write a high-quality professional profile bio for the client to read. It MUST be exactly 1 to 2 short sentences (approx. 10 to 30 words) to ensure it stays between 50 and 200 characters.
-9. Missing Data: If ANY data is missing from the CV or cannot be confidently inferred, use null.
+9. Missing Data: If ANY data is missing from the CV or cannot be confidently inferred, use null (except for pref_location which has a specific fallback).
 </extraction_rules>
 
 <json_schema>
@@ -367,8 +370,8 @@ Return ONLY a valid JSON object matching this exact structure:
   "exp_salary_lakh": "number or null",
   "exp_salary_thousand": "number or null",
   "qualification": "Standardized degree string or null",
-  "cur_location": "City name string or null",
-  "pref_location": "Anywhere in India",
+  "cur_location": "City name, 'Out of India', or null",
+  "pref_location": "City name, 'Out of India', or 'Anywhere in India'",
   "industry": "Industry string or null",
   "gender": "'male', 'female', or null",
   "summary": "Internal summary string for recruiting team or null",
