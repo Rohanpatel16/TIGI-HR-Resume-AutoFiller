@@ -487,6 +487,9 @@ You are an expert technical recruiter with over 10 years of experience in high-g
    - For 'pref_location': Extract the preferred city. If the preferred location is outside India, output EXACTLY "Out of India". If no preferred location is explicitly mentioned in the CV, strictly output "Anywhere in India".
    - DO NOT include state or country names for Indian cities.
 6. Skills: Extract EVERY technical and soft skill explicitly mentioned. Return as an array of strings. Do not skip any.
+   - CRITICAL: Write each skill in its shortest, most canonical and atomic form as it would appear in a professional skills database (e.g., "ATS" not "ATS Management", "SEO" not "Search Engine Optimization").
+   - If a skill is a well-known abbreviation (ATS, CRM, ERP, SAP, SQL, SEO, etc.), ALWAYS prefer the abbreviation over the full phrase.
+   - Do NOT combine multiple skills into one string. Split compound phrases into individual skills where appropriate (e.g., "Communication and Leadership" → ["Communication", "Leadership"]).
 7. Industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). 
 8. Bio Character Limit: Write a high-quality professional profile bio for the client to read. It MUST be exactly 1 to 2 short sentences (approx. 10 to 30 words) to ensure it stays between 50 and 200 characters.
 9. Missing Data: If ANY data is missing from the CV or cannot be confidently inferred, use null (except for pref_location which has a specific fallback).
