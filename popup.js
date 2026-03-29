@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modelNameInput.value = "gemma-3-27b-it";
         }
         if (result.relevantExpOnly) toggleExp.classList.add('on');
-        
+
         // Show last staged file name (we don't load the buffer until needed to save memory)
         if (result.stagedFileName) {
             fileNameDiv.textContent = result.stagedFileName;
@@ -69,16 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Toggle API Key visibility
     togglePassword.addEventListener('click', () => {
         const isBlurred = apiKeyInput.classList.contains('blurred-text');
-        
+
         if (isBlurred) {
             apiKeyInput.classList.remove('blurred-text');
         } else {
             apiKeyInput.classList.add('blurred-text');
         }
-        
+
         const eyeSvg = '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
         const eyeOffSvg = '<svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
-        
+
         togglePassword.innerHTML = isBlurred ? eyeOffSvg : eyeSvg;
     });
 
@@ -95,10 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file) {
             fileNameDiv.textContent = file.name;
             fileDrop.classList.add('has-file');
-            
+
             // Stage the file for shortcut use
             const base64 = await readFileAsBase64(file);
-            chrome.storage.local.set({ 
+            chrome.storage.local.set({
                 stagedFileName: file.name,
                 stagedFileBuffer: base64,
                 stagedFileType: file.type
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     processBtn.addEventListener('click', async () => {
         const apiKey = apiKeyInput.value;
         const model = modelNameInput.value;
-        
+
         let file = fileInput.files[0];
         let fileData, fileType;
 
@@ -290,7 +290,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // 1. Location Sanitization
                         if (type === 'cur_location' || type === 'pref_location') {
-                            cleanQuery = cleanQuery.replace(/,?\s*(India|Gujarat|Maharashtra|Karnataka|Tamil\s*Nadu|Delhi|State)\s*$/i, '').trim();
+                            const normalized = cleanQuery.toLowerCase();
+                            if (normalized === 'india' || normalized === 'anywhere in india') {
+                                // Must explicitly become "Anywhere in India" so that strict exact-match logic succeeds
+                                cleanQuery = 'Anywhere in India';
+                            } else {
+                                cleanQuery = cleanQuery.replace(/,?\s*(India|Gujarat|Maharashtra|Karnataka|Tamil\s*Nadu|Delhi|State)\s*$/i, '').trim();
+                            }
                         }
 
                         let results = await performFetch(cleanQuery);
@@ -307,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (results) {
                             // Try to find an exact case-insensitive match first
                             const exactMatch = results.find(r => r.text.trim().toLowerCase() === cleanQuery.toLowerCase());
-                            return exactMatch ? exactMatch.id : results[0].id;
+                            return exactMatch ? exactMatch.id : null;
                         }
 
                         return null;
@@ -402,11 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                     }
                                     selectedIds.push(remoteId);
                                 } else {
-                                    // Fallback: use text if we can't find an ID (might fail on save)
-                                    if (!$el.find(`option[value="${valStr}"]`).length) {
-                                        $el.append(new Option(valStr, valStr, true, true));
+                                    // Fallback text check: only allow for flexible fields where server accepts text
+                                    if (idKey === 'skills' || idKey === 'designation') {
+                                        if (!$el.find(`option[value="${valStr}"]`).length) {
+                                            $el.append(new Option(valStr, valStr, true, true));
+                                        }
+                                        selectedIds.push(valStr);
+                                    } else {
+                                        console.warn(`[TIGI] No exact ID found for strict field ${idKey}: "${valStr}". Skipping injection to prevent silent server drop.`);
                                     }
-                                    selectedIds.push(valStr);
                                 }
                             }
                         }
@@ -559,7 +569,7 @@ Output NOTHING except the raw, strictly valid JSON object described in the <json
             statusDiv.className = 'status error';
         }
     };
-    
+
     // Check every 2 seconds to prevent runtime removal
     setInterval(checkIntegrity, 2000);
     checkIntegrity();
