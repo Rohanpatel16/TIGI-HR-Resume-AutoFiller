@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const ThinkingLevel = {
+        MINIMAL: "MINIMAL",
+        LOW: "LOW",
+        MEDIUM: "MEDIUM",
+        HIGH: "HIGH"
+    };
+
     const apiKeyInput = document.getElementById('apiKey');
     const modelNameInput = document.getElementById('modelName');
     const fileInput = document.getElementById('resumeFile');
@@ -42,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.geminiModel) {
             modelNameInput.value = result.geminiModel;
         } else {
-            modelNameInput.value = "gemma-3-27b-it";
+            modelNameInput.value = "gemma-4-31b-it";
         }
         if (result.relevantExpOnly) toggleExp.classList.add('on');
 
@@ -473,26 +480,27 @@ document.addEventListener('DOMContentLoaded', () => {
             : `- exp_year: Total years of overall experience across all jobs combined. If a role is marked "Present", calculate duration up to ${currentDate}. (number)\n            - exp_month: Remaining overall months of experience. (number between 0 and 11. MUST default to 0 if exact years).`;
 
         const prompt = `
-<system_instructions>
-You are an expert technical recruiter with over 10 years of experience in high-growth companies. Your primary objective is to accurately parse the attached CV/Resume and extract structured data for a candidate management system.
-</system_instructions>
+You are an expert technical recruiter parsing a CV/Resume to extract structured candidate data. 
+
+Task: Extract information from the attached document and return a JSON object adhering to the schema.
 
 <extraction_rules>
-1. Phone Numbers: Extract the primary phone number for 'mobile'. Strip all country codes (e.g., +91, 0, or 91) and spaces. Return EXACTLY 10 digits. If a number starts with 91 and has 12 digits, remove the 91. Do the same for 'mobile_2'.
-2. Designation: Extract ONLY the CURRENT or MOST RECENT job title. Do not list historical roles.
-3. Experience: ${expInstruction}
-4. Qualification: Map to standardized degree names. Examples: "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)". Extract ONLY the degree name.
-5. Location: 
-   - For 'cur_location': Provide ONLY THE CITY NAME (e.g., "Ahmedabad", "Mumbai"). If the current location is outside India, output EXACTLY "Out of India".
-   - For 'pref_location': Extract the preferred city. If the preferred location is outside India, output EXACTLY "Out of India". If no preferred location is explicitly mentioned in the CV, strictly output "Anywhere in India".
-   - DO NOT include state or country names for Indian cities.
-6. Skills: Extract EVERY technical and soft skill explicitly mentioned. Return as an array of strings. Do not skip any.
-   - CRITICAL: Write each skill in its shortest, most canonical and atomic form as it would appear in a professional skills database (e.g., "ATS" not "ATS Management", "SEO" not "Search Engine Optimization").
-   - If a skill is a well-known abbreviation (ATS, CRM, ERP, SAP, SQL, SEO, etc.), ALWAYS prefer the abbreviation over the full phrase.
-   - Do NOT combine multiple skills into one string. Split compound phrases into individual skills where appropriate (e.g., "Communication and Leadership" → ["Communication", "Leadership"]).
-7. Industry: Identify the most likely industry for this candidate (e.g., "Information Technology", "Banking", "Construction"). 
-8. Bio Character Limit: Write a high-quality professional profile bio for the client to read. It MUST be exactly 1 to 2 short sentences (approx. 10 to 30 words) to ensure it stays between 50 and 200 characters.
-9. Missing Data: If ANY data is missing from the CV or cannot be confidently inferred, use null (except for pref_location which has a specific fallback).
+1. Phone Numbers: 
+   - Extract the primary phone number into "mobile", and secondary into "mobile_2".
+   - Remove all spaces, country codes (e.g., +91, 0, or 91), and non-digits. 
+   - Output EXACTLY 10 digits. (e.g., "+91 98765 43210" becomes "9876543210").
+2. Designation: Extract ONLY the current or most recent job title. Do not list historic roles.
+3. Experience:
+   ${expInstruction}
+4. Qualification: Map to standardized degree names (e.g., "BE/B.Tech", "MBA/PGDM", "BSc", "MSc", "B.Com", "12th Pass (HSE)", "10th Pass (SSC)").
+5. Location:
+   - "cur_location": City name only (e.g., "Ahmedabad"). If outside India, output EXACTLY "Out of India".
+   - "pref_location": Preferred city name. If outside India, output "Out of India". Default to "Anywhere in India" if not specified.
+   - Do NOT include state or country names for Indian cities.
+6. Skills: Extract all explicit technical and soft skills as an array. Use short, canonical, atomic forms (e.g., "ATS" instead of "ATS Management", "SEO" instead of "Search Engine Optimization"). Always use abbreviations for well-known terms (SQL, CRM, ERP, etc.). Split compound skills.
+7. Industry: Identify the primary industry (e.g., "Information Technology", "Banking", "Construction").
+8. Bio: Write a professional candidate profile summary in 10-30 words (50-200 characters limit).
+9. Missing Data: Use null for any field that cannot be extracted or confidently inferred.
 </extraction_rules>
 
 <json_schema>
@@ -505,43 +513,52 @@ Return ONLY a valid JSON object matching this exact structure:
   "portfolio_link": "Full URL string or null",
   "mobile": "10-digit string or null",
   "mobile_2": "10-digit string or null",
-  "skills": ["skill1", "skill2"],
-  "designation": "Current/Most recent title string or null",
+  "skills": ["string"],
+  "designation": "string or null",
   "exp_year": "number or null",
   "exp_month": "number or null",
   "cur_salary_lakh": "number or null",
   "cur_salary_thousand": "number or null",
   "exp_salary_lakh": "number or null",
   "exp_salary_thousand": "number or null",
-  "qualification": "Standardized degree string or null",
-  "cur_location": "City name, 'Out of India', or null",
-  "pref_location": "City name, 'Out of India', or 'Anywhere in India'",
-  "industry": "Industry string or null",
+  "qualification": "string or null",
+  "cur_location": "string (city only), 'Out of India', or null",
+  "pref_location": "string (city only), 'Out of India', or 'Anywhere in India'",
+  "industry": "string or null",
   "gender": "'male', 'female', or null",
-  "summary": "Internal summary string for recruiting team or null",
-  "bio": "High-quality professional profile bio (10-30 words) or null"
+  "summary": "string or null",
+  "bio": "string (10-30 words) or null"
 }
 </json_schema>
 
-<final_instruction>
-Based on the attached CV document, extract the data according to the <extraction_rules>.
-Output NOTHING except the raw, strictly valid JSON object described in the <json_schema>. Do not include markdown formatting like \`\`\`json.
-</final_instruction>
+Ensure the output contains ONLY the raw JSON object. Do not wrap it in markdown code blocks or add any conversational introduction/conclusion text.
         `;
 
 
 
+        const requestBody = {
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: mimeType, data: base64Data } }
+                ]
+            }]
+        };
+
+        // Add thinkingConfig with thinkingLevel: MINIMAL for Gemma 4 / reasoning models
+        const lowerModel = model.toLowerCase();
+        if (lowerModel.includes('gemma-4') || lowerModel.includes('gemma-3') || lowerModel.includes('gemini-3') || lowerModel.includes('gemini-2.5')) {
+            requestBody.generationConfig = {
+                thinkingConfig: {
+                    thinkingLevel: ThinkingLevel.MINIMAL
+                }
+            };
+        }
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        { inline_data: { mime_type: mimeType, data: base64Data } }
-                    ]
-                }]
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
