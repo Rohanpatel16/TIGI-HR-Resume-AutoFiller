@@ -567,7 +567,19 @@ Ensure the output contains ONLY the raw JSON object. Do not wrap it in markdown 
         }
 
         const json = await response.json();
-        const textResponse = json.candidates[0].content.parts[0].text;
+
+        // Extract the response text by skipping reasoning/thought blocks
+        let textResponse = "";
+        const parts = json.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+            if (part.text && !part.thought) {
+                textResponse += part.text;
+            }
+        }
+        // Fallback to first part if no non-thought parts match
+        if (!textResponse && parts.length > 0) {
+            textResponse = parts[0].text || "";
+        }
 
         // Robust JSON extraction using Regex
         const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
