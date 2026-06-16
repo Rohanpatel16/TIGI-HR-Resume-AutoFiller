@@ -103,13 +103,17 @@ document.addEventListener('DOMContentLoaded', () => {
             fileNameDiv.textContent = file.name;
             fileDrop.classList.add('has-file');
 
-            // Stage the file for shortcut use
-            const base64 = await readFileAsBase64(file);
-            chrome.storage.local.set({
-                stagedFileName: file.name,
-                stagedFileBuffer: base64,
-                stagedFileType: file.type
-            });
+            try {
+                // Stage the file for shortcut use
+                const { fileData, fileType } = await prepareFileData(file);
+                chrome.storage.local.set({
+                    stagedFileName: file.name,
+                    stagedFileBuffer: fileData,
+                    stagedFileType: fileType
+                });
+            } catch (err) {
+                console.error("Error staging file:", err);
+            }
         } else {
             fileNameDiv.textContent = '';
             fileDrop.classList.remove('has-file');
@@ -164,8 +168,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (file) {
-            fileData = await readFileAsBase64(file);
-            fileType = file.type;
+            updateStatus("Reading file...", '');
+            processBtn.disabled = true;
+            startTimer();
+            try {
+                const prepared = await prepareFileData(file);
+                fileData = prepared.fileData;
+                fileType = prepared.fileType;
+            } catch (err) {
+                stopTimer(false);
+                updateStatus("Error reading file: " + err.message, 'error');
+                processBtn.disabled = false;
+                return;
+            }
         } else {
             // Check for staged file
             const result = await chrome.storage.local.get(['stagedFileBuffer', 'stagedFileType']);
@@ -180,9 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        updateStatus("Reading file...", '');
-        processBtn.disabled = true;
-        startTimer();
+        if (!file) {
+            processBtn.disabled = true;
+            startTimer();
+        }
 
         updateStatus(`Extracting with ${model}...`, '');
 
@@ -467,6 +483,34 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    }
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async function prepareFileData(file) {
+        let fileType = file.type;
+        let fileData;
+
+        const isDocx = file.name.endsWith('.docx') || fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        if (isDocx) {
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            const text = result.value;
+            fileData = btoa(unescape(encodeURIComponent(text)));
+            fileType = 'text/plain';
+        } else {
+            fileData = await readFileAsBase64(file);
+        }
+
+        return { fileData, fileType };
     }
 
     async function callGeminiAPI(apiKey, model, base64Data, mimeType) {
